@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SafeSpend code generator (keep private)</title>
+<style>
+body{font:16px/1.5 system-ui,sans-serif;max-width:480px;margin:0 auto;padding:20px;background:#f6f4ee;color:#1d2340}
+h1{font-size:22px;margin:0 0 6px} p{color:#6b6f82;margin:0 0 14px}
+input,button{font:inherit;padding:10px 12px;border-radius:10px;border:1px solid #d8d3c4}
+button{background:#1d2340;color:#fff;border:0;font-weight:600;cursor:pointer}
+.code{font:700 22px/1 ui-monospace,monospace;letter-spacing:.05em;background:#fff;border:1px solid #e2ddd0;border-radius:12px;padding:14px;margin:8px 0;display:flex;justify-content:space-between;align-items:center}
+.code button{font-size:13px;padding:6px 10px}
+@media (prefers-color-scheme: dark){body{background:#13162a;color:#eef0f8}.code{background:#1c2038;border-color:#30365a}}
+</style></head><body>
+<h1>Unlock code generator</h1>
+<p>Type the same secret word you put in the app’s CONFIG. It’s remembered on this phone only, so this page is safe to put online.</p>
+<label>Secret word<br><input id="sec" placeholder="your secret word" autocomplete="off" style="width:100%"></label>
+<p style="margin-top:12px"><button id="go">Make a new code</button></p>
+<p id="msg" style="color:#e2483d"></p>
+<div id="out"></div>
+<script>
+const ALPHA = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+function fnv(str){ let h = 0x811c9dc5; for(let i=0;i<str.length;i++){ h ^= str.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; } return h >>> 0; }
+function check4(body, secret){ let h = fnv(body + "|" + secret), out = ""; for(let i=0;i<4;i++){ out += ALPHA[h % 32]; h = Math.floor(h/32) ^ fnv(out + secret); h >>>= 0; } return out; }
+const sec = document.getElementById("sec"), msg = document.getElementById("msg");
+try{ sec.value = localStorage.getItem("ss_gen_secret") || ""; }catch(e){}
+document.getElementById("go").onclick = () => {
+  if(!sec.value.trim()){ msg.textContent = "Type your secret word first."; return; }
+  msg.textContent = "";
+  try{ localStorage.setItem("ss_gen_secret", sec.value); }catch(e){}
+  const r = (window.crypto && crypto.getRandomValues ? crypto.getRandomValues(new Uint8Array(4)) : Uint8Array.from({length:4},()=>Math.floor(Math.random()*256))); let body = ""; r.forEach(b=>body += ALPHA[b % 32]);
+  const code = `SS-${body}-${check4(body, sec.value)}`;
+  const div = document.createElement("div"); div.className = "code";
+  div.innerHTML = `<span>${code}</span><button>Copy</button>`;
+  div.querySelector("button").onclick = e => {
+    const b = e.target;
+    const done = () => { b.textContent = "Copied"; setTimeout(()=>b.textContent="Copy", 1500); };
+    const fallback = () => { const r = document.createRange(); r.selectNodeContents(div.querySelector("span")); const s = getSelection(); s.removeAllRanges(); s.addRange(r); b.textContent = "Selected, now copy"; };
+    if(navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(code).then(done, fallback); else fallback();
+  };
+  document.getElementById("out").prepend(div);
+};
+</script></body></html>
